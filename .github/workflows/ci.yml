@@ -15,4 +15,4 @@ jobs:
       - run: scala-cli fmt --check app integration-test && scala-cli test app
       - run: terraform -chdir=terraform fmt -check
       - run: terraform -chdir=terraform init -backend=false && terraform -chdir=terraform validate
-      - run: scripts/floci-test.sh
+      - run: scala-cli test integration-test

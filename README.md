@@ -13,8 +13,7 @@ There is no custom Lambda handler and no Lambda SDK: the app is an ordinary Unde
 | `Dockerfile` | Builds the app and adds LWA as a Lambda extension |
 | `terraform/` | ECR, IAM role, Lambda (container image), public Function URL |
 | `scripts/build-image.sh`, `scripts/push-image.sh` | Docker build / ECR push (kept out of Terraform) |
-| `integration-test/` | Floci + Testcontainers integration test (scala-cli, munit) |
-| `scripts/floci-test.sh` | The one-command integration test (`scala-cli test integration-test`) |
+| `integration-test/` | Floci + Testcontainers integration test (`scala-cli test integration-test`) |
 
 ## Prerequisites
 
@@ -39,7 +38,7 @@ The same image runs outside Lambda too (the adapter does nothing without the Lam
 ## Floci integration test
 
 ```bash
-scripts/floci-test.sh
+scala-cli test integration-test
 ```
 
 `integration-test/FlociLambdaSuite` uses the [Testcontainers Floci module](https://github.com/floci-io/testcontainers-floci)
@@ -113,7 +112,7 @@ event into a normal HTTP request to `127.0.0.1:8080`, and converts the HTTP resp
 
 ## What is verified where
 
-Verified by `scripts/floci-test.sh`: the image builds and starts as a Lambda container image; LWA starts as an
+Verified by `scala-cli test integration-test`: the image builds and starts as a Lambda container image; LWA starts as an
 extension, passes its readiness check and proxies events; Function URL requests reach Sharaf with method, path, query,
 body and JSON responses intact.
 
