@@ -1,0 +1,5 @@
+.git
+terraform
+scripts
+app/.scala-build
+app/.bsp

@@ -1,0 +1,17 @@
+name: ci
+on: [push, pull_request]
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: 1.9.8
+      - name: Install scala-cli
+        run: |
+          curl -fsSL https://github.com/VirtusLab/scala-cli/releases/download/v1.18.0/scala-cli-x86_64-pc-linux.gz | gunzip > scala-cli
+          sudo install scala-cli /usr/local/bin/
+      - run: cd app && scala-cli fmt --check . && scala-cli test .
+      - run: terraform -chdir=terraform fmt -check
+      - run: scripts/floci-test.sh

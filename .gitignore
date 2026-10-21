@@ -1,0 +1,6 @@
+.scala-build/
+.bsp/
+.terraform/
+*.tfstate
+*.tfstate.*
+*.tfvars
