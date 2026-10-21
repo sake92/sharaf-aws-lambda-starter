@@ -32,38 +32,8 @@ variable "image_digest" {
   }
 }
 
-variable "emulator_endpoint" {
-  description = "ONLY for the Floci integration test: URL of a local AWS emulator. Leave null to use real AWS."
-  type        = string
-  default     = null
-}
-
-locals {
-  emulated = var.emulator_endpoint != null
-}
-
 provider "aws" {
   region = var.region
-
-  # Real AWS: credentials come from the usual AWS_* environment variables / profile.
-  # Emulator: fixed dummy credentials and a fixed endpoint, so real AWS can never be reached.
-  access_key                  = local.emulated ? "test" : null
-  secret_key                  = local.emulated ? "test" : null
-  skip_credentials_validation = local.emulated
-  skip_metadata_api_check     = local.emulated
-  skip_requesting_account_id  = local.emulated
-
-  dynamic "endpoints" {
-    for_each = local.emulated ? [var.emulator_endpoint] : []
-    content {
-      ecr        = endpoints.value
-      iam        = endpoints.value
-      lambda     = endpoints.value
-      cloudwatch = endpoints.value
-      sts        = endpoints.value
-      logs       = endpoints.value
-    }
-  }
 }
 
 resource "aws_ecr_repository" "app" {

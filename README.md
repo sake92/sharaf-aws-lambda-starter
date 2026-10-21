@@ -2,7 +2,8 @@
 
 A minimal [Sharaf](https://sake92.github.io/sharaf/) (Scala 3) HTTP app running on **AWS Lambda** through the
 [AWS Lambda Web Adapter](https://github.com/aws/aws-lambda-web-adapter) (LWA), deployed with **Terraform**, with an
-automated integration test on [Floci](https://github.com/floci-io/floci) (a local AWS emulator).
+automated integration test on [Floci](https://github.com/floci-io/floci) (a local AWS emulator) via
+[Testcontainers](https://testcontainers.com/modules/floci/).
 
 There is no custom Lambda handler and no Lambda SDK: the app is an ordinary Undertow-based Sharaf server.
 
@@ -12,11 +13,12 @@ There is no custom Lambda handler and no Lambda SDK: the app is an ordinary Unde
 | `Dockerfile` | Builds the app and adds LWA as a Lambda extension |
 | `terraform/` | ECR, IAM role, Lambda (container image), public Function URL |
 | `scripts/build-image.sh`, `scripts/push-image.sh` | Docker build / ECR push (kept out of Terraform) |
-| `scripts/floci-test.sh` | The one-command integration test |
+| `integration-test/` | Floci + Testcontainers integration test (scala-cli, munit) |
+| `scripts/floci-test.sh` | The one-command integration test (`scala-cli test integration-test`) |
 
 ## Prerequisites
 
-Docker, [scala-cli](https://scala-cli.virtuslab.org/) (local run only), Terraform >= 1.6, AWS CLI v2, `jq`, `curl`.
+Docker and [scala-cli](https://scala-cli.virtuslab.org/) (for the app and the Floci test); Terraform >= 1.6 and AWS CLI v2 for deploying.
 Deploying needs an AWS account and credentials; the Floci test needs neither.
 
 ## Run locally (no AWS)
@@ -40,24 +42,27 @@ The same image runs outside Lambda too (the adapter does nothing without the Lam
 scripts/floci-test.sh
 ```
 
-It starts a pinned Floci (`floci/floci:2.3.0`, Docker socket mounted, own Docker network), builds the image, and then
-follows the **same sequence as the real deployment** with the same Terraform and push script: create ECR (Floci's
-emulated registry) -> push image -> create Lambda from `repo@sha256:<digest>` + Function URL. It then sends real HTTP
-requests to the Function URL and asserts status codes and JSON for `/health` and `/hello`, that the `?greeting=` query
-parameter reaches Sharaf, that an invalid body yields `400` and an unknown route `404`. Containers, network, images and
-state are removed on exit, also on failure (Floci and Lambda container logs are printed first).
+`integration-test/FlociLambdaSuite` uses the [Testcontainers Floci module](https://github.com/floci-io/testcontainers-floci)
+(`io.floci:testcontainers-floci-aws`, with Floci pinned to `floci/floci:2.3.0`). It:
 
-Safety: the script exports dummy credentials and a fixed `http://localhost:<port>` endpoint, and Terraform's
-`emulator_endpoint` variable hard-wires dummy credentials and local endpoints into the provider. Option: `FLOCI_PORT`.
+1. runs `scripts/build-image.sh` (the same image build as for AWS), tagging it with an AWS-shaped ECR URI;
+2. starts Floci (Docker socket + dedicated network are handled by the module);
+3. creates a container-image Lambda and a Function URL with the AWS SDK (Floci runs the locally built image as-is, so no
+   registry push is needed);
+4. sends real HTTP requests to the Function URL and asserts status codes and JSON for `/health` and `/hello`, that the
+   `?greeting=` query parameter reaches Sharaf, that an invalid body yields `400` and an unknown route `404`.
 
-Path under test: `curl -> Floci Function URL -> Lambda Web Adapter (extension in the Lambda container) -> Sharaf`.
+Testcontainers removes the containers and network, also on failure; Floci logs are printed when an assertion fails.
+The test only talks to the Testcontainers-managed Floci endpoint with its dummy credentials, never to real AWS.
 
-### Floci notes / limitations found (Floci 2.3.0, Docker 28)
-* Floci does start `/opt/extensions/*` itself, so LWA works unchanged.
-* When Floci runs in Docker it starts its backing ECR registry itself, but that container is not resolvable by name on
-  the Docker network and it emits absolute upload URLs (`http://<registry>:5000/...`), so `docker push` from the host
-  fails (`503`, then DNS errors). Workaround in the script: start `registry:2.8.3` first, under the name Floci looks
-  for, on the same network and with `REGISTRY_HTTP_RELATIVEURLS=true`; Floci adopts it. The path is not shortened.
+Path under test: `HTTP client -> Floci Function URL -> Lambda Web Adapter (extension in the Lambda container) -> Sharaf`.
+
+Terraform is deliberately **not** exercised against Floci (an emulator says little about real IAM/permission behaviour);
+CI only runs `terraform fmt` and `validate`.
+
+Floci notes: it starts `/opt/extensions/*` itself, so LWA works unchanged. It does not enforce IAM or the Function URL
+permissions, and Function URLs are routed by Host header, so the test keeps the generated `*.lambda-url.<region>.localhost`
+host name and swaps in the mapped container port.
 
 ## Deploy to AWS
 
@@ -110,13 +115,8 @@ event into a normal HTTP request to `127.0.0.1:8080`, and converts the HTTP resp
 
 Verified by `scripts/floci-test.sh`: the image builds and starts as a Lambda container image; LWA starts as an
 extension, passes its readiness check and proxies events; Function URL requests reach Sharaf with method, path, query,
-body and JSON responses intact; the Terraform configuration (ECR, role, Lambda from digest, URL, both permissions)
-applies and destroys cleanly against the emulator.
+body and JSON responses intact.
 
-**Not** verified (needs a real AWS account): that AWS accepts the IAM/permission setup and the public URL really is
-callable without auth, real ECR authentication and image pull, real Lambda init timing/cold start (JVM, 1024 MB,
-30 s timeout are untuned), CloudWatch logging, x86_64 vs your build host, and the exact real Function URL event.
-Also, in the environment where this was authored, `public.ecr.aws` rate-limited anonymous pulls, so the pinned
-LWA image (`public.ecr.aws/awsguru/aws-lambda-adapter:1.1.0`) could not be pulled; the Floci run used a local image
-with that tag containing `lambda-adapter` built from the `v1.1.0` source. Run the test in your environment to
-confirm with the official image.
+**Not** verified (needs a real AWS account): the Terraform configuration and that AWS accepts the IAM/permission setup
+(the public URL really being callable without auth), ECR push/auth and image pull, real Lambda init timing/cold start
+(JVM, 1024 MB, 30 s timeout are untuned), CloudWatch logging, and the exact real Function URL event.
