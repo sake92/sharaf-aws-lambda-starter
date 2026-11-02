@@ -1,13 +1,20 @@
 # syntax=docker/dockerfile:1
 FROM eclipse-temurin:21.0.12_8-jdk-jammy AS build
-ADD --checksum=sha256:eb41442f870bcae75aa5d6622ac96a173dae14fed59f71c97125eb21536bb060 \
-    https://github.com/VirtusLab/scala-cli/releases/download/v1.18.0/scala-cli-x86_64-pc-linux.gz /tmp/scala-cli.gz
-RUN gunzip -c /tmp/scala-cli.gz > /usr/local/bin/scala-cli && chmod +x /usr/local/bin/scala-cli
+ADD --checksum=sha256:d173ae4bd6eb07fd70b000a12cb7275c7aab26c657e3c9932f497d9578d71eb1 \
+    https://repo.maven.apache.org/maven2/org/scala-sbt/sbt-launch/2.0.12/sbt-launch-2.0.12.jar /opt/sbt-launch.jar
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    clang libgc-dev libunwind-dev zlib1g-dev libssl-dev \
+    && rm -rf /var/lib/apt/lists/*
 WORKDIR /build
+COPY build.sbt ./
+COPY project/ project/
 COPY app/ app/
-RUN scala-cli --power package --server=false --assembly --main-class demo.Main app -o app.jar
+RUN java -jar /opt/sbt-launch.jar "app/nativeLink"
 
-FROM eclipse-temurin:21.0.12_8-jre-jammy
+FROM debian:bookworm-slim
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    libgc1 libunwind8 zlib1g libssl3 \
+    && rm -rf /var/lib/apt/lists/*
 # Lambda Web Adapter runs as a Lambda extension: it polls the Lambda Runtime API and
 # forwards every invocation to the HTTP server below as an ordinary HTTP request.
 COPY --from=public.ecr.aws/awsguru/aws-lambda-adapter:1.1.0 /lambda-adapter /opt/extensions/lambda-adapter
@@ -18,5 +25,5 @@ ENV PORT=8080 \
     AWS_LWA_READINESS_CHECK_PROTOCOL=http \
     AWS_LWA_READINESS_CHECK_PATH=/health \
     AWS_LWA_READINESS_CHECK_HEALTHY_STATUS=200-299
-COPY --from=build /build/app.jar /app/app.jar
-ENTRYPOINT ["java", "-XX:+UseSerialGC", "-XX:TieredStopAtLevel=1", "-jar", "/app/app.jar"]
+COPY --from=build /build/app/target/native/sharaf-lambda /app/sharaf-lambda
+ENTRYPOINT ["/app/sharaf-lambda"]

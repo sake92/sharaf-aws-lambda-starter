@@ -5,32 +5,41 @@ A minimal [Sharaf](https://sake92.github.io/sharaf/) (Scala 3) HTTP app running 
 automated integration test on [Floci](https://github.com/floci-io/floci) (a local AWS emulator) via
 [Testcontainers](https://testcontainers.com/modules/floci/).
 
-There is no custom Lambda handler and no Lambda SDK: the app is an ordinary Undertow-based Sharaf server.
+There is no custom Lambda handler and no Lambda SDK: the app is an ordinary http4s/Ember-based Sharaf server,
+compiled to a Scala Native Linux executable.
 
 | Path | What |
 |---|---|
-| `app/` | Sharaf app (scala-cli): `GET /health`, `POST /hello` (+ munit tests) |
+| `app/` | Scala Native Sharaf app: `GET /health`, `POST /hello` |
+| `app-jvm-test/` | JVM route tests reusing the app sources |
+| `build.sbt`, `project/` | sbt build, dependency versions, Scala Native and formatting plugins |
 | `Dockerfile` | Builds the app and adds LWA as a Lambda extension |
 | `terraform/` | ECR, IAM role, Lambda (container image), public Function URL |
 | `scripts/build-image.sh`, `scripts/push-image.sh` | Docker build / ECR push (kept out of Terraform) |
-| `integration-test/` | Floci + Testcontainers integration test (`scala-cli test integration-test`) |
+| `integration-test/` | Floci + Testcontainers integration test (`sbt integrationTest/test`) |
 
 ## Prerequisites
 
-Docker and [scala-cli](https://scala-cli.virtuslab.org/) (for the app and the Floci test); Terraform >= 1.6 and AWS CLI v2 for deploying.
+JDK 21, [sbt](https://www.scala-sbt.org/download/) (the build pins sbt 2.0.12), and a native toolchain
+(Clang plus `libgc`, `libunwind`, zlib, and OpenSSL development packages) for local linking; Docker for the image and Floci test;
+Terraform >= 1.6 and AWS CLI v2 for deploying.
 Deploying needs an AWS account and credentials; the Floci test needs neither.
 
 ## Run locally (no AWS)
 
 ```bash
-cd app && scala-cli run .                 # listens on 0.0.0.0:8080; override with PORT=9000
+sbt app/run                              # runs the native executable on 0.0.0.0:8080; override with PORT=9000
 curl localhost:8080/health                # {"status":"ok"}
 curl -X POST localhost:8080/hello -d '{"name":"Ana"}'                 # {"greeting":"Hello, Ana!"}
 curl -X POST 'localhost:8080/hello?greeting=Hi' -d '{"name":"Ana"}'   # {"greeting":"Hi, Ana!"}
 ```
 
-Unit tests and formatting: `cd app && scala-cli test . && scala-cli fmt --check .`
+Unit tests: `sbt test` (JVM route tests; Docker is only needed for the separate integration tests).
+Check formatting: `sbt 'scalafmtCheckAll; scalafmtSbtCheck; integrationTest/scalafmtCheckAll'`.
+Format sources and build files: `sbt 'scalafmtAll; scalafmtSbt; integrationTest/scalafmtAll'`.
 (Terraform: `terraform -chdir=terraform fmt -check`.)
+
+Build a release executable for the current host: `sbt app/nativeLink` (writes `app/target/native/sharaf-lambda`; on macOS this is a macOS executable). The deployment image builds the Linux/amd64 executable in Docker with `scripts/build-image.sh`.
 
 The same image runs outside Lambda too (the adapter does nothing without the Lambda runtime API):
 `scripts/build-image.sh && docker run --rm -p 8080:8080 sharaf-lambda:local`.
@@ -38,7 +47,7 @@ The same image runs outside Lambda too (the adapter does nothing without the Lam
 ## Floci integration test
 
 ```bash
-scala-cli test integration-test
+sbt integrationTest/test
 ```
 
 `integration-test/FlociLambdaSuite` uses the [Testcontainers Floci module](https://github.com/floci-io/testcontainers-floci)
@@ -108,14 +117,14 @@ LWA is a Lambda extension (`/opt/extensions/lambda-adapter`). It polls the Lambd
 Function URL each one is a payload-format-2.0 HTTP event (method, path, query string, headers, base64 body). LWA waits
 at start-up until `GET /health` (`AWS_LWA_READINESS_CHECK_PATH`) on `AWS_LWA_PORT` (8080) returns 2xx, converts every
 event into a normal HTTP request to `127.0.0.1:8080`, and converts the HTTP response back into the Lambda response
-(status, headers, body). Sharaf never knows it is on Lambda. The image's `ENTRYPOINT` is just `java -jar`.
+(status, headers, body). Sharaf never knows it is on Lambda. The image's `ENTRYPOINT` is the native executable.
 
 ## What is verified where
 
-Verified by `scala-cli test integration-test`: the image builds and starts as a Lambda container image; LWA starts as an
+Verified by `sbt integrationTest/test`: the image builds and starts as a Lambda container image; LWA starts as an
 extension, passes its readiness check and proxies events; Function URL requests reach Sharaf with method, path, query,
 body and JSON responses intact.
 
 **Not** verified (needs a real AWS account): the Terraform configuration and that AWS accepts the IAM/permission setup
 (the public URL really being callable without auth), ECR push/auth and image pull, real Lambda init timing/cold start
-(JVM, 1024 MB, 30 s timeout are untuned), CloudWatch logging, and the exact real Function URL event.
+(native executable, 1024 MB, 30 s timeout are untuned), CloudWatch logging, and the exact real Function URL event.
