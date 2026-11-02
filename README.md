@@ -10,8 +10,7 @@ compiled to a Scala Native Linux executable.
 
 | Path | What |
 |---|---|
-| `app/` | Scala Native Sharaf app: `GET /health`, `POST /hello` |
-| `app-jvm-test/` | JVM route tests reusing the app sources |
+| `app/` | Scala Native Sharaf app and native route tests: `GET /health`, `POST /hello` |
 | `build.sbt`, `project/` | sbt build, dependency versions, Scala Native and formatting plugins |
 | `Dockerfile` | Builds the app and adds LWA as a Lambda extension |
 | `terraform/` | ECR, IAM role, Lambda (container image), public Function URL |
@@ -34,9 +33,9 @@ curl -X POST localhost:8080/hello -d '{"name":"Ana"}'                 # {"greeti
 curl -X POST 'localhost:8080/hello?greeting=Hi' -d '{"name":"Ana"}'   # {"greeting":"Hi, Ana!"}
 ```
 
-Unit tests: `sbt test` (JVM route tests; Docker is only needed for the separate integration tests).
-Check formatting: `sbt 'scalafmtCheckAll; scalafmtSbtCheck; integrationTest/scalafmtCheckAll'`.
-Format sources and build files: `sbt 'scalafmtAll; scalafmtSbt; integrationTest/scalafmtAll'`.
+Route tests: `sbt app/test` (Scala Native tests run in the `app/` module; Docker is only needed for the separate integration tests).
+Check formatting: `sbt 'app/scalafmtCheckAll; scalafmtCheckAll; scalafmtSbtCheck; integrationTest/scalafmtCheckAll'`.
+Format sources and build files: `sbt 'app/scalafmtAll; scalafmtAll; scalafmtSbt; integrationTest/scalafmtAll'`.
 (Terraform: `terraform -chdir=terraform fmt -check`.)
 
 Build a release executable for the current host: `sbt app/nativeLink` (writes `app/target/native/sharaf-lambda`; on macOS this is a macOS executable). The deployment image builds the Linux/amd64 executable in Docker with `scripts/build-image.sh`.

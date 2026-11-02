@@ -3,17 +3,17 @@
 ## Stack
 
 - Use Scala 3.9.0 with sbt 2.0.12 and Scala Native 0.5.12.
-- The production app is the `app/` http4s/Ember Scala Native executable.
-- Keep JVM-only route tests in `app-jvm-test/`; keep Floci image tests in `integration-test/`.
+- The production app and native route tests are in the `app/` http4s/Ember Scala Native module.
+- Keep Floci image tests in `integration-test/`; they remain JVM-only because they use AWS SDK and Testcontainers.
 
 ## Commands
 
 | Task | Command |
 | --- | --- |
-| JVM route tests | `sbt test` |
+| Native route tests | `sbt app/test` |
 | Native release link | `sbt app/nativeLink` |
 | Floci integration | `sbt integrationTest/test` |
-| Formatting check | `sbt 'scalafmtCheckAll; scalafmtSbtCheck; integrationTest/scalafmtCheckAll'` |
+| Formatting check | `sbt 'app/scalafmtCheckAll; scalafmtCheckAll; scalafmtSbtCheck; integrationTest/scalafmtCheckAll'` |
 | Terraform checks | `terraform -chdir=terraform fmt -check` and `terraform -chdir=terraform validate` |
 | Build local image | `scripts/build-image.sh` |
 
