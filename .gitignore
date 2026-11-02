@@ -1,5 +1,8 @@
 .scala-build/
 .bsp/
+target/
+.bloop/
+.metals/
 .terraform/
 *.tfstate
 *.tfstate.*

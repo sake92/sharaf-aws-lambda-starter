@@ -1,6 +1,9 @@
 .git
 terraform
 scripts
-app/.scala-build
-app/.bsp
+**/target
+**/.scala-build
+**/.bsp
+.bloop
+.metals
 integration-test
