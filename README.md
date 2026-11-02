@@ -17,6 +17,44 @@ compiled to a Scala Native Linux executable.
 | `scripts/build-image.sh`, `scripts/push-image.sh` | Docker build / ECR push (kept out of OpenTofu) |
 | `integration-test/` | Floci + Testcontainers integration test (`sbt integrationTest/test`) |
 
+## Deployment architecture
+
+```mermaid
+flowchart TB
+    build["Local machine / CI<br/>Docker build + push scripts"]
+    client[HTTP client]
+
+    subgraph aws["AWS resources managed by OpenTofu"]
+        ecr["ECR repository<br/>App + adapter image"]
+        url["Public Lambda Function URL<br/>No authentication"]
+        role["IAM execution role<br/>CloudWatch logging permissions"]
+        logs["CloudWatch Logs<br/>7-day retention"]
+
+        subgraph fn["Lambda function - container image"]
+            runtime[Lambda Runtime API]
+            adapter[Lambda Web Adapter extension]
+            app["Sharaf / http4s / Ember<br/>Scala Native executable"]
+            runtime <-->|Invocation event / response| adapter
+            adapter <-->|HTTP on 127.0.0.1:8080| app
+        end
+
+        url <-->|Invoke / return result| runtime
+        ecr -.->|Deploy image by digest| fn
+        role -.->|Assumed by Lambda| fn
+        fn -->|Logs| logs
+    end
+
+    build -->|Push image| ecr
+    client <-->|HTTPS| url
+```
+
+OpenTofu creates the ECR repository, execution role and log group first. The scripts build and push the image;
+a second apply uses its digest to create the Lambda function and Function URL. ECR stores the deployment image;
+requests go through the Function URL to the running Lambda environment.
+
+Inside Lambda, the adapter translates invocation events into local HTTP requests to Sharaf and translates responses
+back. Both processes run from the same image. See [how the adapter works](#how-the-adapter-works) below.
+
 ## Prerequisites
 
 JDK 21, [sbt](https://www.scala-sbt.org/download/) (the build pins sbt 2.0.12), and a native toolchain
@@ -116,11 +154,22 @@ Local images/tags can be removed with `docker rmi`.
 
 ## How the adapter works
 
-LWA is a Lambda extension (`/opt/extensions/lambda-adapter`). It polls the Lambda Runtime API for invocations; for a
-Function URL each one is a payload-format-2.0 HTTP event (method, path, query string, headers, base64 body). LWA waits
-at start-up until `GET /health` (`AWS_LWA_READINESS_CHECK_PATH`) on `AWS_LWA_PORT` (8080) returns 2xx, converts every
-event into a normal HTTP request to `127.0.0.1:8080`, and converts the HTTP response back into the Lambda response
-(status, headers, body). Sharaf never knows it is on Lambda. The image's `ENTRYPOINT` is the native executable.
+The adapter translates between Lambda's event protocol and the ordinary HTTP protocol that Sharaf speaks.
+
+The Function URL turns an incoming HTTP request into a Lambda event containing the method, path, query string,
+headers and body. LWA polls the Lambda Runtime API for that event, translates it into a local HTTP request, and
+sends it to Sharaf. The response travels back through the same components: LWA converts Sharaf's HTTP status,
+headers and body into a Lambda response, which the Function URL returns to the client. Port 8080 is internal;
+the public endpoint is the Function URL.
+
+At startup, Lambda starts LWA as an extension (`/opt/extensions/lambda-adapter`) alongside the native executable
+(the image's `ENTRYPOINT`). Before accepting invocations, LWA waits until `GET /health` on port 8080 returns 2xx,
+as configured in the `Dockerfile`. The server stays running to handle subsequent invocations in that execution
+environment; it does not start again for each request.
+
+Sharaf only handles ordinary HTTP requests, so its routes need no Lambda-specific code. See the
+[upstream architecture guide](https://github.com/aws/aws-lambda-web-adapter/blob/main/docs/guide/src/reference/architecture.md)
+for more detail.
 
 ## What is verified where
 
