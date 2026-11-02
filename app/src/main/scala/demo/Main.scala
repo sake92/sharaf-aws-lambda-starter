@@ -37,6 +37,9 @@ object Main extends IOApp.Simple:
 
   given LoggerFactory[IO] = NoOpFactory[IO]
 
+  private[demo] val httpApp =
+    SharafHttpApp(SharafHandler.exceptions(SharafHandler.routes(routes), jsonErrors))
+
   private def configuredPort: Port =
     val portNumber = sys.env.get("PORT").map(_.toInt).getOrElse(8080)
     Port.fromInt(portNumber).getOrElse(throw IllegalArgumentException(s"Invalid PORT: $portNumber"))
@@ -46,7 +49,7 @@ object Main extends IOApp.Simple:
       .default[IO]
       .withHost(ipv4"0.0.0.0")
       .withPort(configuredPort)
-      .withHttpApp(SharafHttpApp(SharafHandler.exceptions(SharafHandler.routes(routes), jsonErrors)))
+      .withHttpApp(httpApp)
       .build
       .evalTap(server => IO.println(s"Server started at ${server.address}"))
       .useForever
