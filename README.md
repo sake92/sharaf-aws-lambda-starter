@@ -1,7 +1,7 @@
 # sharaf-aws-lambda-starter
 
 A minimal [Sharaf](https://sake92.github.io/sharaf/) (Scala 3) HTTP app running on **AWS Lambda** through the
-[AWS Lambda Web Adapter](https://github.com/aws/aws-lambda-web-adapter) (LWA), deployed with **Terraform**, with an
+[AWS Lambda Web Adapter](https://github.com/aws/aws-lambda-web-adapter) (LWA), deployed with **OpenTofu**, with an
 automated integration test on [Floci](https://github.com/floci-io/floci) (a local AWS emulator) via
 [Testcontainers](https://testcontainers.com/modules/floci/).
 
@@ -14,14 +14,14 @@ compiled to a Scala Native Linux executable.
 | `build.sbt`, `project/` | sbt build, dependency versions, Scala Native and formatting plugins |
 | `Dockerfile` | Builds the app and adds LWA as a Lambda extension |
 | `terraform/` | ECR, IAM role, Lambda (container image), public Function URL |
-| `scripts/build-image.sh`, `scripts/push-image.sh` | Docker build / ECR push (kept out of Terraform) |
+| `scripts/build-image.sh`, `scripts/push-image.sh` | Docker build / ECR push (kept out of OpenTofu) |
 | `integration-test/` | Floci + Testcontainers integration test (`sbt integrationTest/test`) |
 
 ## Prerequisites
 
 JDK 21, [sbt](https://www.scala-sbt.org/download/) (the build pins sbt 2.0.12), and a native toolchain
 (Clang plus `libgc`, `libunwind`, zlib, and OpenSSL development packages) for local linking; Docker for the image and Floci test;
-Terraform >= 1.6 and AWS CLI v2 for deploying.
+[OpenTofu](https://opentofu.org/docs/intro/install/) >= 1.13.2 and AWS CLI v2 for deploying.
 Deploying needs an AWS account and credentials; the Floci test needs neither.
 
 ## Run locally (no AWS)
@@ -36,7 +36,7 @@ curl -X POST 'localhost:8080/hello?greeting=Hi' -d '{"name":"Ana"}'   # {"greeti
 Route tests: `sbt app/test` (Scala Native tests run in the `app/` module; Docker is only needed for the separate integration tests).
 Check formatting: `sbt 'app/scalafmtCheckAll; scalafmtCheckAll; scalafmtSbtCheck; integrationTest/scalafmtCheckAll'`.
 Format sources and build files: `sbt 'app/scalafmtAll; scalafmtAll; scalafmtSbt; integrationTest/scalafmtAll'`.
-(Terraform: `terraform -chdir=terraform fmt -check`.)
+(OpenTofu: `tofu -chdir=terraform fmt -check`.)
 
 Build a release executable for the current host: `sbt app/nativeLink` (writes `app/target/native/sharaf-lambda`; on macOS this is a macOS executable). The deployment image builds the Linux/amd64 executable in Docker with `scripts/build-image.sh`.
 
@@ -64,14 +64,18 @@ The test only talks to the Testcontainers-managed Floci endpoint with its dummy 
 
 Path under test: `HTTP client -> Floci Function URL -> Lambda Web Adapter (extension in the Lambda container) -> Sharaf`.
 
-Terraform is deliberately **not** exercised against Floci (an emulator says little about real IAM/permission behaviour);
-CI only runs `terraform fmt` and `validate`.
+OpenTofu is deliberately **not** exercised against Floci (an emulator says little about real IAM/permission behaviour);
+CI only runs `tofu fmt` and `validate`.
 
 Floci notes: it starts `/opt/extensions/*` itself, so LWA works unchanged. It does not enforce IAM or the Function URL
 permissions, and Function URLs are routed by Host header, so the test keeps the generated `*.lambda-url.<region>.localhost`
 host name and swaps in the mapped container port.
 
 ## Deploy to AWS
+
+For an existing Terraform deployment, back up the state before switching, then run `tofu -chdir=terraform init`
+and `tofu -chdir=terraform plan`. Resolve any unexpected changes before applying; see the
+[OpenTofu migration guide](https://opentofu.org/docs/intro/migration/migration-guide/).
 
 > **The Function URL is public and unauthenticated** (`authorization_type = "NONE"`): anyone on the internet can call
 > it and you pay for it. Demo only; destroy it when done. Since Oct 2025 a public URL needs both
@@ -82,11 +86,11 @@ The Lambda needs an image that must already exist in ECR, hence two applies:
 
 ```bash
 export AWS_REGION=eu-west-1 TF_VAR_region=eu-west-1    # TF_VAR_name_prefix=... to change the default "sharaf-demo"
-terraform -chdir=terraform init
-terraform -chdir=terraform apply                       # 1) ECR repository, IAM role, log group
+tofu -chdir=terraform init
+tofu -chdir=terraform apply                       # 1) ECR repository, IAM role, log group
 scripts/build-image.sh
-DIGEST=$(scripts/push-image.sh "$(terraform -chdir=terraform output -raw ecr_repository_url)")
-terraform -chdir=terraform apply -var "image_digest=$DIGEST"   # 2) Lambda + Function URL
+DIGEST=$(scripts/push-image.sh "$(tofu -chdir=terraform output -raw ecr_repository_url)")
+tofu -chdir=terraform apply -var "image_digest=$DIGEST"   # 2) Lambda + Function URL
 ```
 
 The function is deployed from the immutable digest (`repo@sha256:...`); the ECR repo is tag-immutable, so
@@ -95,18 +99,18 @@ The function is deployed from the immutable digest (`repo@sha256:...`); the ECR 
 Call it:
 
 ```bash
-URL=$(terraform -chdir=terraform output -raw function_url)
+URL=$(tofu -chdir=terraform output -raw function_url)
 curl "${URL}health"
 curl -X POST "${URL}hello" -d '{"name":"Ana"}'
 ```
 
 **Update the image:** change the code, then repeat `build-image.sh`, `push-image.sh`, and
-`terraform apply -var "image_digest=$DIGEST"`.
+`tofu -chdir=terraform apply -var "image_digest=$DIGEST"`.
 
 **Remove everything** (Lambda, URL, role, log group, ECR repository *including its images*; the repo uses `force_delete`):
 
 ```bash
-terraform -chdir=terraform destroy
+tofu -chdir=terraform destroy
 ```
 Local images/tags can be removed with `docker rmi`.
 
@@ -124,6 +128,6 @@ Verified by `sbt integrationTest/test`: the image builds and starts as a Lambda 
 extension, passes its readiness check and proxies events; Function URL requests reach Sharaf with method, path, query,
 body and JSON responses intact.
 
-**Not** verified (needs a real AWS account): the Terraform configuration and that AWS accepts the IAM/permission setup
+**Not** verified (needs a real AWS account): applying the OpenTofu configuration and AWS accepting the IAM/permission setup
 (the public URL really being callable without auth), ECR push/auth and image pull, real Lambda init timing/cold start
 (native executable, 1024 MB, 30 s timeout are untuned), CloudWatch logging, and the exact real Function URL event.

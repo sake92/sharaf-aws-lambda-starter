@@ -1,5 +1,5 @@
 terraform {
-  required_version = ">= 1.6"
+  required_version = ">= 1.13.2"
 
   required_providers {
     aws = {
@@ -39,7 +39,7 @@ provider "aws" {
 resource "aws_ecr_repository" "app" {
   name                 = var.name_prefix
   image_tag_mutability = "IMMUTABLE"
-  # Lets `terraform destroy` delete the repository together with its images.
+  # Lets `tofu destroy` delete the repository together with its images.
   force_delete = true
 }
 

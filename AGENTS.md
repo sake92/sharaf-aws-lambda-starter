@@ -14,14 +14,14 @@
 | Native release link | `sbt app/nativeLink` |
 | Floci integration | `sbt integrationTest/test` |
 | Formatting check | `sbt 'app/scalafmtCheckAll; scalafmtCheckAll; scalafmtSbtCheck; integrationTest/scalafmtCheckAll'` |
-| Terraform checks | `terraform -chdir=terraform fmt -check` and `terraform -chdir=terraform validate` |
+| OpenTofu checks | `tofu -chdir=terraform fmt -check` and `tofu -chdir=terraform validate` |
 | Build local image | `scripts/build-image.sh` |
 
 Local native linking needs Clang plus the `libgc`, `libunwind`, zlib, and OpenSSL development packages. Docker installs these in the build stage.
 
 ## Conventions
 
-- Preserve the Lambda Web Adapter, Terraform Function URL, route paths, response statuses, and JSON content-type headers.
+- Preserve the Lambda Web Adapter, OpenTofu-managed Function URL, route paths, response statuses, and JSON content-type headers.
 - Keep native startup and shutdown in `Main`; do not add a custom Lambda handler or SDK dependency.
 - Integration tests build the same Docker image used for deployment and require Docker; they use dummy Floci credentials only.
 - Do not claim AWS deployment or cold-start behavior from local checks; see `README.md` for verification boundaries.
