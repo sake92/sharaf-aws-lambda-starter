@@ -46,7 +46,8 @@ requests go through the Function URL to the running Lambda environment.
 ## Prerequisites
 
 JDK 21, [sbt](https://www.scala-sbt.org/download/) (the build pins sbt 2.0.12), and a native toolchain
-(Clang plus `libgc`, `libunwind`, zlib, and OpenSSL development packages) for local linking; Docker for the image and Floci test;
+(Clang plus `libgc`, `libunwind`, zlib, and OpenSSL development packages) for local linking;
+libcurl and libidn2 development packages for the sttp native route tests; Docker for the image and Floci test;
 [OpenTofu](https://opentofu.org/docs/intro/install/) >= 1.13.2 and AWS CLI v2 for deploying.
 Deploying needs an AWS account and credentials; the Floci test needs neither.
 

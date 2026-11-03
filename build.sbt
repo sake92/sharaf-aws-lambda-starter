@@ -8,7 +8,6 @@ publish / skip := true
 val munit = "org.scalameta" %% "munit" % "1.2.1" % Test
 val nativeMunit = "org.scalameta" %% "munit" % "1.3.6" % Test
 val sttp = "com.softwaremill.sttp.client4" %% "core" % "4.0.13" % Test
-val http4sClient = "org.http4s" %% "http4s-client" % "1.0.0-M48" % Test
 
 lazy val root = project
   .in(file("."))
@@ -26,7 +25,7 @@ lazy val app = project
       "ba.sake" %% "sharaf-http4s" % "0.20.0",
       "org.http4s" %% "http4s-ember-server" % "1.0.0-M48",
       nativeMunit,
-      http4sClient
+      sttp
     ),
     nativeConfig ~= { _.withMode(Mode.releaseFast).withMultithreading(true) }
   )
