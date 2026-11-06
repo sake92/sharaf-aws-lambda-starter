@@ -15,7 +15,7 @@ jobs:
         with:
           tofu_version: '1.13.2'
       - run: sudo apt-get update && sudo apt-get install -y --no-install-recommends clang libgc-dev libunwind-dev zlib1g-dev libssl-dev libcurl4-openssl-dev libidn2-dev
-      - run: sbt 'app/scalafmtCheckAll; scalafmtCheckAll; scalafmtSbtCheck; integrationTest/scalafmtCheckAll; app/test'
+      - run: sbt 'app/scalafmtCheckAll; scalafmtCheckAll; scalafmtSbtCheck; integrationTest/scalafmtCheckAll; app/testFull'
       - run: tofu -chdir=terraform fmt -check
       - run: tofu -chdir=terraform init -backend=false && tofu -chdir=terraform validate
-      - run: sbt integrationTest/test
+      - run: sbt integrationTest/testFull

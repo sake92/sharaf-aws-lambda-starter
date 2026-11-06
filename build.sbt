@@ -2,6 +2,7 @@ import scala.scalanative.build.Mode
 
 ThisBuild / scalaVersion := "3.9.0"
 ThisBuild / version := "0.1.0-SNAPSHOT"
+ThisBuild / resolvers += "Sonatype snapshots" at "https://central.sonatype.com/repository/maven-snapshots/"
 
 publish / skip := true
 
@@ -22,8 +23,7 @@ lazy val app = project
     Compile / mainClass := Some("demo.Main"),
     Compile / crossTarget := baseDirectory.value / "target" / "native",
     libraryDependencies ++= Seq(
-      "ba.sake" %% "sharaf-http4s" % "0.20.0",
-      "org.http4s" %% "http4s-ember-server" % "1.0.0-M48",
+      "ba.sake" %% "sharaf-jdk-httpserver" % "0.20.1-SNAPSHOT",
       nativeMunit,
       sttp
     ),

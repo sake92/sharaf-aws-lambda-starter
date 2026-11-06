@@ -1,12 +1,8 @@
 package demo
 
 import ba.sake.tupson.*
-import cats.effect.{IO, Resource}
-import cats.effect.unsafe.implicits.global
-import com.comcast.ip4s.*
-import demo.Main.given
+import java.util.concurrent.{Executors, TimeUnit}
 import munit.FunSuite
-import org.http4s.ember.server.EmberServerBuilder
 import sttp.client4.*
 
 class MainSuite extends FunSuite:
@@ -14,17 +10,19 @@ class MainSuite extends FunSuite:
   private val jsonContentType = "application/json; charset=utf-8"
 
   private def withServer(check: (String, SyncBackend) => Unit): Unit =
-    val resources = for
-      server <- EmberServerBuilder
-        .default[IO]
-        .withHost(ipv4"127.0.0.1")
-        .withPort(port"0")
-        .withHttpApp(Main.httpApp)
-        .build
-      backend <- Resource.make(IO(DefaultSyncBackend()))(backend => IO(backend.close()))
-    yield (s"http://127.0.0.1:${server.address.port.value}", backend)
-
-    resources.use { case (baseUrl, backend) => IO.blocking(check(baseUrl, backend)) }.unsafeRunSync()
+    val executor = Executors.newFixedThreadPool(10)
+    try {
+      val server = Main.createServer("127.0.0.1", 0, executor)
+      try {
+        server.start()
+        val backend = DefaultSyncBackend()
+        try check(s"http://127.0.0.1:${server.getAddress.getPort}", backend)
+        finally backend.close()
+      } finally server.stop(0)
+    } finally {
+      executor.shutdownNow()
+      executor.awaitTermination(5, TimeUnit.SECONDS)
+    }
 
   test("GET /health returns JSON") {
     withServer { (baseUrl, backend) =>

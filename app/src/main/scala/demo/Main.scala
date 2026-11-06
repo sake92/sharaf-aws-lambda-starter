@@ -1,22 +1,19 @@
 package demo
 
-import cats.effect.IO
-import cats.effect.IOApp
+import java.net.InetSocketAddress
+import java.util.concurrent.{Executor, Executors, TimeUnit}
+import com.sun.net.httpserver.HttpServer
 import ba.sake.querson.QueryStringRW
 import ba.sake.sharaf.*
-import ba.sake.sharaf.http4s.*
+import ba.sake.sharaf.jdkhttp.SharafJdkHttpHandler
 import ba.sake.tupson.JsonRW
-import com.comcast.ip4s.*
-import org.http4s.ember.server.EmberServerBuilder
-import org.typelevel.log4cats.LoggerFactory
-import org.typelevel.log4cats.noop.NoOpFactory
 
 case class Health(status: String) derives JsonRW
 case class HelloRequest(name: String) derives JsonRW
 case class HelloResponse(greeting: String) derives JsonRW
 case class HelloParams(greeting: Option[String]) derives QueryStringRW
 
-object Main extends IOApp.Simple:
+object Main:
 
   private val jsonContentType = "application/json; charset=utf-8"
 
@@ -35,21 +32,43 @@ object Main extends IOApp.Simple:
   private val jsonErrors: ExceptionMapper =
     ExceptionMapper.json.andThen(_.settingHeader("Content-Type", jsonContentType))
 
-  given LoggerFactory[IO] = NoOpFactory[IO]
+  private[demo] def createServer(host: String, port: Int, executor: Executor): HttpServer =
+    val notFoundHandler: SharafHandler = context =>
+      SharafHandler.DefaultNotFoundHandler.handle(context).removingHeader("Content-Type")
+    val handler = SharafHandler.exceptions(SharafHandler.routes(routes, notFoundHandler), jsonErrors)
+    val server = HttpServer.create(InetSocketAddress(host, port), 0)
+    server.createContext("/", SharafJdkHttpHandler(handler))
+    server.setExecutor(executor)
+    server
 
-  private[demo] val httpApp =
-    SharafHttpApp(SharafHandler.exceptions(SharafHandler.routes(routes), jsonErrors))
-
-  private def configuredPort: Port =
+  private def configuredPort: Int =
     val portNumber = sys.env.get("PORT").map(_.toInt).getOrElse(8080)
-    Port.fromInt(portNumber).getOrElse(throw IllegalArgumentException(s"Invalid PORT: $portNumber"))
+    require(portNumber >= 0 && portNumber <= 65535, s"Invalid PORT: $portNumber")
+    portNumber
 
-  def run: IO[Unit] =
-    EmberServerBuilder
-      .default[IO]
-      .withHost(ipv4"0.0.0.0")
-      .withPort(configuredPort)
-      .withHttpApp(httpApp)
-      .build
-      .evalTap(server => IO.println(s"Server started at ${server.address}"))
-      .useForever
+  def main(args: Array[String]): Unit =
+    val port = configuredPort
+    val executor = Executors.newFixedThreadPool(10)
+    try {
+      val server = createServer("0.0.0.0", port, executor)
+      def stop(): Unit =
+        try server.stop(0)
+        finally
+          executor.shutdownNow()
+          executor.awaitTermination(5, TimeUnit.SECONDS)
+      val shutdownHook = Thread(() => stop(), "server-shutdown")
+      Runtime.getRuntime.addShutdownHook(shutdownHook)
+      try {
+        server.start()
+        println(s"Server started at ${server.getAddress}")
+      } catch {
+        case e: Throwable =>
+          Runtime.getRuntime.removeShutdownHook(shutdownHook)
+          stop()
+          throw e
+      }
+    } catch {
+      case e: Throwable =>
+        executor.shutdownNow()
+        throw e
+    }

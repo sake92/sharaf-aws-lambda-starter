@@ -5,8 +5,8 @@ A minimal [Sharaf](https://sake92.github.io/sharaf/) (Scala 3) HTTP app running 
 automated integration test on [Floci](https://github.com/floci-io/floci) (a local AWS emulator) via
 [Testcontainers](https://testcontainers.com/modules/floci/).
 
-The app is an ordinary http4s/Ember-based Sharaf server compiled with Scala Native.
-Deployment to AWS with OpenTofu has been manually verified.
+The app uses Sharaf's JDK HTTP server adapter (`0.20.1-SNAPSHOT`), compiled with Scala Native.
+The previous http4s/Ember version was manually deployed to AWS with OpenTofu; the JDK backend needs a new AWS verification.
 
 ## Deployment architecture
 
@@ -24,7 +24,7 @@ flowchart TB
         subgraph fn["Lambda function - container image"]
             runtime[Lambda Runtime API]
             adapter[Lambda Web Adapter extension]
-            app["Sharaf / http4s / Ember<br/>Scala Native executable"]
+            app["Sharaf / JDK HTTP server<br/>Scala Native executable"]
             runtime <-->|Invocation event / response| adapter
             adapter <-->|HTTP on 127.0.0.1:8080| app
         end
@@ -75,13 +75,13 @@ curl -X POST 'localhost:8080/hello?greeting=Hi' -d '{"name":"Ana"}'
 Run the route tests:
 
 ```bash
-sbt app/test
+sbt app/testFull
 ```
 
 Run the end-to-end integration test with Floci (requires Docker):
 
 ```bash
-sbt integrationTest/test
+sbt integrationTest/testFull
 ```
 
 ## Deploy to AWS
