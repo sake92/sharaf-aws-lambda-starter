@@ -1,6 +1,7 @@
 package demo
 
 import ba.sake.tupson.*
+import ba.sake.sharaf.exceptions.ProblemDetails
 import munit.FunSuite
 import sttp.client4.*
 
@@ -51,10 +52,13 @@ class MainSuite extends FunSuite:
     }
   }
 
-  test("unknown route returns a plain-text 404") {
+  test("unknown route returns a JSON 404") {
     withServer { (baseUrl, backend) =>
       val res = quickRequest.get(uri"$baseUrl/does-not-exist").send(backend)
       assertEquals(res.code.code, 404)
-      assertEquals(res.header("content-type"), Some("text/plain; charset=utf-8"))
+      assertEquals(res.header("content-type"), Some(jsonContentType))
+      val problem = res.body.parseJson[ProblemDetails]
+      assertEquals(problem.status, 404)
+      assertEquals(problem.title, "Not Found")
     }
   }

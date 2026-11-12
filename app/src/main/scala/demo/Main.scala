@@ -4,6 +4,7 @@ import java.net.InetSocketAddress
 import ba.sake.potateh.{Server, ServerConfig}
 import ba.sake.querson.QueryStringRW
 import ba.sake.sharaf.*
+import ba.sake.sharaf.exceptions.NotFoundException
 import ba.sake.sharaf.potateh.PotatehSharafServer
 import ba.sake.tupson.JsonRW
 
@@ -14,25 +15,22 @@ case class HelloParams(greeting: Option[String]) derives QueryStringRW
 
 object Main:
 
-  private val jsonContentType = "application/json; charset=utf-8"
-
   val routes = Routes:
     case GET -> Path("health") =>
-      Response.withBody(Health("ok")).settingHeader("Content-Type", jsonContentType)
+      Response.withBody(Health("ok"))
 
     case POST -> Path("hello") =>
       val body = Request.current.bodyJson[HelloRequest]
       val params = Request.current.queryParams[HelloParams]
       val greeting = params.greeting.getOrElse("Hello")
-      Response
-        .withBody(HelloResponse(s"$greeting, ${body.name}!"))
-        .settingHeader("Content-Type", jsonContentType)
-
-  private val jsonErrors: ExceptionMapper =
-    ExceptionMapper.json.andThen(_.settingHeader("Content-Type", jsonContentType))
+      Response.withBody(HelloResponse(s"$greeting, ${body.name}!"))
 
   private[demo] def startServer(host: String, port: Int): Server =
-    val handler = SharafHandler.exceptions(SharafHandler.routes(routes), jsonErrors)
+    val notFoundHandler: SharafHandler = _ => throw NotFoundException("Route")
+    val handler = SharafHandler.exceptions(
+      SharafHandler.routes(routes, notFoundHandler),
+      ExceptionMapper.json
+    )
     val config = ServerConfig.Default.withBindAddress(InetSocketAddress(host, port))
     PotatehSharafServer.start(config, handler)
 
