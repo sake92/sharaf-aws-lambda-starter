@@ -6,6 +6,7 @@ automated integration test on [Floci](https://github.com/floci-io/floci) (a loca
 [Testcontainers](https://testcontainers.com/modules/floci/).
 
 The app uses Sharaf's experimental Potateh adapter (`0.21.0`), compiled with Scala Native.
+The locally linked Linux x86-64 executable is approximately 7.1 MiB (unstripped); size varies by build and platform.
 The previous http4s/Ember version was manually deployed to AWS with OpenTofu; the Potateh backend needs a new AWS verification.
 
 ## Deployment architecture
