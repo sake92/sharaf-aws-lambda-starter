@@ -6,8 +6,7 @@ ThisBuild / resolvers += "Sonatype snapshots" at "https://central.sonatype.com/r
 
 publish / skip := true
 
-val munit = "org.scalameta" %% "munit" % "1.2.1" % Test
-val nativeMunit = "org.scalameta" %% "munit" % "1.3.6" % Test
+val munit = "org.scalameta" %% "munit" % "1.3.6" % Test
 val sttp = "com.softwaremill.sttp.client4" %% "core" % "4.0.13" % Test
 
 lazy val root = project
@@ -24,7 +23,7 @@ lazy val app = project
     Compile / crossTarget := baseDirectory.value / "target" / "native",
     libraryDependencies ++= Seq(
       "ba.sake" %% "sharaf-potateh" % "0.21.0",
-      nativeMunit,
+      munit,
       sttp
     ),
     nativeConfig ~= { _.withMode(Mode.releaseFast).withMultithreading(true) }
