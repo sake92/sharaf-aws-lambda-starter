@@ -1,7 +1,6 @@
 package demo
 
 import ba.sake.tupson.*
-import java.util.concurrent.{Executors, TimeUnit}
 import munit.FunSuite
 import sttp.client4.*
 
@@ -10,19 +9,12 @@ class MainSuite extends FunSuite:
   private val jsonContentType = "application/json; charset=utf-8"
 
   private def withServer(check: (String, SyncBackend) => Unit): Unit =
-    val executor = Executors.newFixedThreadPool(10)
+    val server = Main.startServer("127.0.0.1", 0)
     try {
-      val server = Main.createServer("127.0.0.1", 0, executor)
-      try {
-        server.start()
-        val backend = DefaultSyncBackend()
-        try check(s"http://127.0.0.1:${server.getAddress.getPort}", backend)
-        finally backend.close()
-      } finally server.stop(0)
-    } finally {
-      executor.shutdownNow()
-      executor.awaitTermination(5, TimeUnit.SECONDS)
-    }
+      val backend = DefaultSyncBackend()
+      try check(s"http://127.0.0.1:${server.address.getPort}", backend)
+      finally backend.close()
+    } finally server.stop()
 
   test("GET /health returns JSON") {
     withServer { (baseUrl, backend) =>

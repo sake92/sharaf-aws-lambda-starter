@@ -23,7 +23,7 @@ lazy val app = project
     Compile / mainClass := Some("demo.Main"),
     Compile / crossTarget := baseDirectory.value / "target" / "native",
     libraryDependencies ++= Seq(
-      "ba.sake" %% "sharaf-jdk-httpserver" % "0.20.1-SNAPSHOT",
+      "ba.sake" %% "sharaf-potateh" % "0.21.0",
       nativeMunit,
       sttp
     ),
