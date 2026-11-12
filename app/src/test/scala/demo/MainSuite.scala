@@ -55,6 +55,6 @@ class MainSuite extends FunSuite:
     withServer { (baseUrl, backend) =>
       val res = quickRequest.get(uri"$baseUrl/does-not-exist").send(backend)
       assertEquals(res.code.code, 404)
-      assertEquals(res.header("content-type"), None)
+      assertEquals(res.header("content-type"), Some("text/plain; charset=utf-8"))
     }
   }

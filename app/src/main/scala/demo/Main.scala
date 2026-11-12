@@ -32,9 +32,7 @@ object Main:
     ExceptionMapper.json.andThen(_.settingHeader("Content-Type", jsonContentType))
 
   private[demo] def startServer(host: String, port: Int): Server =
-    val notFoundHandler: SharafHandler = context =>
-      SharafHandler.DefaultNotFoundHandler.handle(context).removingHeader("Content-Type")
-    val handler = SharafHandler.exceptions(SharafHandler.routes(routes, notFoundHandler), jsonErrors)
+    val handler = SharafHandler.exceptions(SharafHandler.routes(routes), jsonErrors)
     val config = ServerConfig.Default.withBindAddress(InetSocketAddress(host, port))
     PotatehSharafServer.start(config, handler)
 
