@@ -1,14 +1,14 @@
 # syntax=docker/dockerfile:1
-FROM ghcr.io/graalvm/native-image-community:25 AS build
+FROM ghcr.io/graalvm/native-image-community:25-muslib AS build
 ADD --checksum=sha256:d173ae4bd6eb07fd70b000a12cb7275c7aab26c657e3c9932f497d9578d71eb1 \
     https://repo.maven.apache.org/maven2/org/scala-sbt/sbt-launch/2.0.12/sbt-launch-2.0.12.jar /opt/sbt-launch.jar
 WORKDIR /build
 COPY build.sbt ./
 COPY project/ project/
 COPY app/ app/
-RUN java -jar /opt/sbt-launch.jar "app/nativeImage"
+RUN java -jar /opt/sbt-launch.jar 'set app / nativeImageOptions ++= Seq("--static", "--libc=musl")' "app/nativeImage"
 
-FROM oraclelinux:9-slim
+FROM alpine:3.24
 # Lambda Web Adapter runs as a Lambda extension: it polls the Lambda Runtime API and
 # forwards every invocation to the HTTP server below as an ordinary HTTP request.
 COPY --from=public.ecr.aws/awsguru/aws-lambda-adapter:1.1.0 /lambda-adapter /opt/extensions/lambda-adapter

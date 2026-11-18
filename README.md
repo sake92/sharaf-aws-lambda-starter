@@ -6,6 +6,7 @@ automated integration test on [Floci](https://github.com/floci-io/floci) (a loca
 [Testcontainers](https://testcontainers.com/modules/floci/).
 
 The app uses Sharaf's experimental Potateh adapter (`0.24.0`), compiled with GraalVM Native Image.
+The Docker build uses a statically linked musl executable and an Alpine runtime image.
 The previous http4s/Ember version was manually deployed to AWS with OpenTofu; this version needs a new AWS verification.
 
 ## Deployment architecture
