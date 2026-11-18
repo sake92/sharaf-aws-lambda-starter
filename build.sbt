@@ -1,5 +1,3 @@
-import scala.scalanative.build.Mode
-
 ThisBuild / scalaVersion := "3.9.0"
 ThisBuild / version := "0.1.0-SNAPSHOT"
 ThisBuild / resolvers += "Sonatype snapshots" at "https://central.sonatype.com/repository/maven-snapshots/"
@@ -16,17 +14,17 @@ lazy val root = project
 
 lazy val app = project
   .in(file("app"))
-  .enablePlugins(ScalaNativePlugin)
+  .enablePlugins(NativeImagePlugin)
   .settings(
     name := "sharaf-lambda",
     Compile / mainClass := Some("demo.Main"),
-    Compile / crossTarget := baseDirectory.value / "target" / "native",
     libraryDependencies ++= Seq(
-      "ba.sake" %% "sharaf-potateh" % "0.21.0",
+      "ba.sake" %% "sharaf-potateh" % "0.24.0",
       munit,
       sttp
     ),
-    nativeConfig ~= { _.withMode(Mode.releaseFast).withMultithreading(true) }
+    nativeImageCommand := Seq("native-image"),
+    nativeImageOptions ++= Seq("--no-fallback", "-march=compatibility")
   )
 
 // Run explicitly: this suite builds a native image and requires Docker.

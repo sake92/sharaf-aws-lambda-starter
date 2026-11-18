@@ -1,7 +1,5 @@
 package demo
 
-import java.net.InetSocketAddress
-import ba.sake.potateh.{Server, ServerConfig}
 import ba.sake.querson.QueryStringRW
 import ba.sake.sharaf.*
 import ba.sake.sharaf.exceptions.NotFoundException
@@ -25,14 +23,12 @@ object Main:
       val greeting = params.greeting.getOrElse("Hello")
       Response.withBody(HelloResponse(s"$greeting, ${body.name}!"))
 
-  private[demo] def startServer(host: String, port: Int): Server =
+  private[demo] def startServer(host: String, port: Int): PotatehSharafServer =
     val notFoundHandler: SharafHandler = _ => throw NotFoundException("Route")
-    val handler = SharafHandler.exceptions(
-      SharafHandler.routes(routes, notFoundHandler),
-      ExceptionMapper.json
-    )
-    val config = ServerConfig.Default.withBindAddress(InetSocketAddress(host, port))
-    PotatehSharafServer.start(config, handler)
+    val server =
+      PotatehSharafServer(routes, host, port, exceptionMapper = ExceptionMapper.json, notFoundHandler = notFoundHandler)
+    server.start()
+    server
 
   private def configuredPort: Int =
     val portNumber = sys.env.get("PORT").map(_.toInt).getOrElse(8080)
@@ -45,7 +41,7 @@ object Main:
     val shutdownHook = Thread(() => server.stop(), "server-shutdown")
     try {
       Runtime.getRuntime.addShutdownHook(shutdownHook)
-      println(s"Server started at ${server.address}")
+      println(s"Server started on port ${server.port}")
     } catch {
       case e: Throwable =>
         server.stop()

@@ -5,9 +5,8 @@ A minimal [Sharaf](https://sake92.github.io/sharaf/) (Scala 3) HTTP app running 
 automated integration test on [Floci](https://github.com/floci-io/floci) (a local AWS emulator) via
 [Testcontainers](https://testcontainers.com/modules/floci/).
 
-The app uses Sharaf's experimental Potateh adapter (`0.21.0`), compiled with Scala Native.
-The locally linked Linux x86-64 executable is approximately 7.1 MiB (unstripped); size varies by build and platform.
-The previous http4s/Ember version was manually deployed to AWS with OpenTofu; the Potateh backend needs a new AWS verification.
+The app uses Sharaf's experimental Potateh adapter (`0.24.0`), compiled with GraalVM Native Image.
+The previous http4s/Ember version was manually deployed to AWS with OpenTofu; this version needs a new AWS verification.
 
 ## Deployment architecture
 
@@ -25,7 +24,7 @@ flowchart TB
         subgraph fn["Lambda function - container image"]
             runtime[Lambda Runtime API]
             adapter[Lambda Web Adapter extension]
-            app["Sharaf / Potateh<br/>Scala Native executable"]
+            app["Sharaf / Potateh<br/>GraalVM native executable"]
             runtime <-->|Invocation event / response| adapter
             adapter <-->|HTTP on 127.0.0.1:8080| app
         end
@@ -46,9 +45,8 @@ requests go through the Function URL to the running Lambda environment.
 
 ## Prerequisites
 
-JDK 21, [sbt](https://www.scala-sbt.org/download/) (the build pins sbt 2.0.12), and a native toolchain
-(Clang plus `libgc`, `libunwind`, zlib, and OpenSSL development packages) for local linking;
-libcurl and libidn2 development packages for the sttp native route tests; Docker for the image and Floci test;
+JDK 21 or later and [sbt](https://www.scala-sbt.org/download/) (the build pins sbt 2.0.12) for JVM development;
+GraalVM 25 with `native-image` and a C toolchain for local native builds; Docker for the image and Floci test;
 [OpenTofu](https://opentofu.org/docs/intro/install/) >= 1.13.2 and AWS CLI v2 for deploying.
 Deploying needs an AWS account and credentials; the Floci test needs neither.
 
@@ -77,6 +75,13 @@ Run the route tests:
 
 ```bash
 sbt app/testFull
+```
+
+Build the local executable with GraalVM on `PATH`:
+
+```bash
+sbt app/nativeImage
+target/out/jvm/scala-3.9.0/sharaf-lambda/native-image/sharaf-lambda
 ```
 
 Run the end-to-end integration test with Floci (requires Docker):
@@ -127,4 +132,4 @@ Local images/tags can be removed with `docker rmi`.
 ## How the adapter works
 
 The AWS Lambda Web Adapter translates Lambda invocation events into HTTP requests to the ordinary Sharaf server and converts its HTTP responses back into Lambda responses.
-The adapter and the Scala Native app are packaged together in the deployment Docker image.
+The adapter and the GraalVM native app are packaged together in the deployment Docker image.

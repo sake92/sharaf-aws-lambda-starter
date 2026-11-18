@@ -1,16 +1,14 @@
 # syntax=docker/dockerfile:1
-FROM eclipse-temurin:21-jdk-alpine-3.24 AS build
+FROM ghcr.io/graalvm/native-image-community:25 AS build
 ADD --checksum=sha256:d173ae4bd6eb07fd70b000a12cb7275c7aab26c657e3c9932f497d9578d71eb1 \
     https://repo.maven.apache.org/maven2/org/scala-sbt/sbt-launch/2.0.12/sbt-launch-2.0.12.jar /opt/sbt-launch.jar
-RUN apk add --no-cache clang lld build-base openssl-dev
 WORKDIR /build
 COPY build.sbt ./
 COPY project/ project/
 COPY app/ app/
-RUN java -jar /opt/sbt-launch.jar "app/nativeLink"
+RUN java -jar /opt/sbt-launch.jar "app/nativeImage"
 
-FROM alpine:3.24
-RUN apk add --no-cache libcrypto3
+FROM oraclelinux:9-slim
 # Lambda Web Adapter runs as a Lambda extension: it polls the Lambda Runtime API and
 # forwards every invocation to the HTTP server below as an ordinary HTTP request.
 COPY --from=public.ecr.aws/awsguru/aws-lambda-adapter:1.1.0 /lambda-adapter /opt/extensions/lambda-adapter
@@ -21,5 +19,5 @@ ENV PORT=8080 \
     AWS_LWA_READINESS_CHECK_PROTOCOL=http \
     AWS_LWA_READINESS_CHECK_PATH=/health \
     AWS_LWA_READINESS_CHECK_HEALTHY_STATUS=200-299
-COPY --from=build /build/app/target/native/sharaf-lambda /app/sharaf-lambda
+COPY --from=build /build/target/out/jvm/scala-3.9.0/sharaf-lambda/native-image/sharaf-lambda /app/sharaf-lambda
 ENTRYPOINT ["/app/sharaf-lambda"]

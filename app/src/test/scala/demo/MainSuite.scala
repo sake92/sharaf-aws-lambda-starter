@@ -13,7 +13,7 @@ class MainSuite extends FunSuite:
     val server = Main.startServer("127.0.0.1", 0)
     try {
       val backend = DefaultSyncBackend()
-      try check(s"http://127.0.0.1:${server.address.getPort}", backend)
+      try check(s"http://127.0.0.1:${server.port}", backend)
       finally backend.close()
     } finally server.stop()
 
