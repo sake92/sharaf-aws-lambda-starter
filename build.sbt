@@ -17,7 +17,7 @@ lazy val app = project
   .enablePlugins(NativeImagePlugin)
   .settings(
     name := "sharaf-lambda",
-    Compile / mainClass := Some("demo.Main"),
+    Compile / mainClass := Some("demo.runServer"),
     libraryDependencies ++= Seq(
       "ba.sake" %% "sharaf-potateh" % "0.24.0",
       munit,

@@ -5,7 +5,7 @@ import ba.sake.sharaf.exceptions.ProblemDetails
 import munit.FunSuite
 import sttp.client4.*
 
-class MainSuite extends FunSuite:
+class MainSuite extends FunSuite {
 
   private val jsonContentType = "application/json; charset=utf-8"
 
@@ -62,3 +62,4 @@ class MainSuite extends FunSuite:
       assertEquals(problem.title, "Not Found")
     }
   }
+}

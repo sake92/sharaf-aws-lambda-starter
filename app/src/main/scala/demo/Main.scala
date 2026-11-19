@@ -11,7 +11,7 @@ case class HelloRequest(name: String) derives JsonRW
 case class HelloResponse(greeting: String) derives JsonRW
 case class HelloParams(greeting: Option[String]) derives QueryStringRW
 
-object Main:
+object Main {
 
   val routes = Routes:
     case GET -> Path("health") =>
@@ -30,20 +30,10 @@ object Main:
     server.start()
     server
 
-  private def configuredPort: Int =
-    val portNumber = sys.env.get("PORT").map(_.toInt).getOrElse(8080)
-    require(portNumber >= 0 && portNumber <= 65535, s"Invalid PORT: $portNumber")
-    portNumber
+}
 
-  def main(args: Array[String]): Unit =
-    val port = configuredPort
-    val server = startServer("0.0.0.0", port)
-    val shutdownHook = Thread(() => server.stop(), "server-shutdown")
-    try {
-      Runtime.getRuntime.addShutdownHook(shutdownHook)
-      println(s"Server started on port ${server.port}")
-    } catch {
-      case e: Throwable =>
-        server.stop()
-        throw e
-    }
+@main def runServer(): Unit =
+  val port = sys.env.get("PORT").map(_.toInt).getOrElse(8080)
+  require(port >= 0 && port <= 65535, s"Invalid PORT: $port")
+  val server = Main.startServer("0.0.0.0", port)
+  println(s"Server started on port ${server.port}")

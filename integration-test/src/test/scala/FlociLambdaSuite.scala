@@ -10,7 +10,7 @@ import software.amazon.awssdk.services.lambda.model.*
 import sttp.client4.quick.*
 
 /** HTTP client -> Floci Function URL -> Lambda Web Adapter -> Sharaf (the same image as the AWS deployment). */
-class FlociLambdaSuite extends munit.FunSuite:
+class FlociLambdaSuite extends munit.FunSuite {
 
   override val munitTimeout: Duration = 5.minutes
 
@@ -117,3 +117,4 @@ class FlociLambdaSuite extends munit.FunSuite:
       assertEquals(quickRequest.get(uri"$functionUrl/does-not-exist").send().code.code, 404)
     }
   }
+}
