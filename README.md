@@ -120,10 +120,24 @@ scripts/deploy-local.sh
 
 [Try the HTTP endpoints](#try-the-http-endpoints) using the Floci Function URL.
 
-When you're done, destroy the local resources before removing the emulator.
+Set `TF_WORKSPACE=floci` to destroy the local resources. Keep Floci running until the destroy finishes.
 
 ```bash
 TF_WORKSPACE=floci tofu -chdir=terraform destroy
+docker compose down
+```
+
+If Compose reports that `sharaf-floci` is still in use, check which container is attached:
+
+```bash
+docker network inspect sharaf-floci --format '{{range .Containers}}{{println .Name}}{{end}}'
+```
+
+If the only container listed is Floci's ECR registry, detach it and rerun teardown.
+This preserves the registry container and its data.
+
+```bash
+docker network disconnect sharaf-floci floci-aws-ecr-registry
 docker compose down
 ```
 
@@ -167,8 +181,11 @@ and CloudWatch Logs have their own pricing. [DynamoDB pricing](https://aws.amazo
 **Remove everything** (Lambda, URL, role, log group, DynamoDB table and its data, ECR repository *including its images*; the repo uses `force_delete`):
 
 ```bash
-tofu -chdir=terraform destroy
+TF_WORKSPACE=default tofu -chdir=terraform destroy
 ```
+Set the workspace explicitly on destroy so OpenTofu targets the intended state. An inline
+`TF_WORKSPACE=...` assignment applies only to that command.
+
 Local images/tags can be removed with `docker rmi`.
 
 ## Try the HTTP endpoints
