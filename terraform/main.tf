@@ -32,8 +32,30 @@ variable "image_digest" {
   }
 }
 
+locals {
+  use_floci      = terraform.workspace == "floci"
+  floci_endpoint = "http://127.0.0.1:4566"
+}
+
 provider "aws" {
-  region = var.region
+  region                      = local.use_floci ? "us-east-1" : var.region
+  access_key                  = local.use_floci ? "test" : null
+  secret_key                  = local.use_floci ? "test" : null
+  skip_credentials_validation = local.use_floci
+  skip_metadata_api_check     = local.use_floci
+  skip_requesting_account_id  = local.use_floci
+
+  dynamic "endpoints" {
+    for_each = local.use_floci ? [local.floci_endpoint] : []
+    content {
+      cloudwatchlogs = endpoints.value
+      dynamodb       = endpoints.value
+      ecr            = endpoints.value
+      iam            = endpoints.value
+      lambda         = endpoints.value
+      sts            = endpoints.value
+    }
+  }
 }
 
 resource "aws_ecr_repository" "app" {
@@ -114,6 +136,24 @@ resource "aws_lambda_function" "app" {
   architectures = ["x86_64"]
   memory_size   = 1024
   timeout       = 30
+
+  dynamic "environment" {
+    for_each = local.use_floci ? [1] : []
+    content {
+      variables = {
+        AWS_ENDPOINT_URL_DYNAMODB = "http://floci:4566"
+      }
+    }
+  }
+
+  # Floci reads back empty image settings for images that use their Dockerfile defaults.
+  dynamic "image_config" {
+    for_each = local.use_floci ? [1] : []
+    content {
+      command     = []
+      entry_point = []
+    }
+  }
 
   depends_on = [aws_iam_role_policy.logging, aws_iam_role_policy.greetings, aws_cloudwatch_log_group.app]
 }

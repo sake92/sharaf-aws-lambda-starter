@@ -1,0 +1,14 @@
+services:
+  floci:
+    image: floci/floci:2.3.0
+    ports:
+      - "127.0.0.1:4566:4566"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+    environment:
+      FLOCI_SERVICES_DOCKER_NETWORK: sharaf-floci
+      FLOCI_SERVICES_ECR_URI_STYLE: path
+
+networks:
+  default:
+    name: sharaf-floci

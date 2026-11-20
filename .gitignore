@@ -5,6 +5,7 @@ target/
 .metals/
 Lunacy/
 .terraform/
+terraform.tfstate.d/
 *.tfstate
 *.tfstate.*
 *.tfvars
