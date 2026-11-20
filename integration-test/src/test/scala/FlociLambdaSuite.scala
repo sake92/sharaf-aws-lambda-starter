@@ -132,25 +132,9 @@ class FlociLambdaSuite extends munit.FunSuite {
     }
   }
 
-  test("POST /hello") {
-    dumpLogsOnFailure {
-      val res = quickRequest.post(uri"$functionUrl/hello").body("""{"name":"Ana"}""").send()
-      assertEquals(res.code.code, 200)
-      assertEquals(res.body, """{"greeting":"Hello, Ana!"}""")
-    }
-  }
-
-  test("query parameter reaches Sharaf through the adapter") {
-    dumpLogsOnFailure {
-      val res = quickRequest.post(uri"$functionUrl/hello?greeting=Hi").body("""{"name":"Ana"}""").send()
-      assertEquals(res.code.code, 200)
-      assertEquals(res.body, """{"greeting":"Hi, Ana!"}""")
-    }
-  }
-
   test("invalid body gives 400, unknown route 404") {
     dumpLogsOnFailure {
-      assertEquals(quickRequest.post(uri"$functionUrl/hello").body("""{"nope":1}""").send().code.code, 400)
+      assertEquals(quickRequest.post(uri"$functionUrl/greetings").body("""{"nope":1}""").send().code.code, 400)
       assertEquals(quickRequest.get(uri"$functionUrl/does-not-exist").send().code.code, 404)
     }
   }

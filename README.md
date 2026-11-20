@@ -1,13 +1,14 @@
 # sharaf-aws-lambda-starter
 
 A minimal [Sharaf](https://sake92.github.io/sharaf/) (Scala 3) HTTP app running on **AWS Lambda** through the
-[AWS Lambda Web Adapter](https://github.com/aws/aws-lambda-web-adapter) (LWA), deployed with **OpenTofu**, with an
-automated integration test on [Floci](https://github.com/floci-io/floci) (a local AWS emulator) via
+[AWS Lambda Web Adapter](https://github.com/aws/aws-lambda-web-adapter) (LWA),
+deployed with **OpenTofu**,
+with an automated integration test on [Floci](https://github.com/floci-io/floci) (a local AWS emulator) via
 [Testcontainers](https://testcontainers.com/modules/floci/).
 
-The app uses Sharaf's experimental Potateh adapter (`0.24.0`), compiled with GraalVM Native Image.
+The app is compiled with GraalVM Native Image.
 The Docker build uses a statically linked musl executable and an Alpine runtime image.
-The previous http4s/Ember version was manually deployed to AWS with OpenTofu; this version needs a new AWS verification.
+
 
 ## Deployment architecture
 
@@ -90,12 +91,14 @@ sbt integrationTest/testFull
 
 ## Provision resources locally with OpenTofu and Floci
 
-From the repo root, use Docker Compose to start Floci 2.3.0 and wait for its health check.
+From the repo root, use Docker Compose to start Floci 2.3.0 and its web console.
 Compose creates the network that Floci's registry and Lambda containers use.
 
 ```bash
 docker compose up --wait
 ```
+
+Open [Floci UI](http://localhost:4500) to browse resources in `us-east-1` after applying the local configuration.
 
 For the initial setup, apply the base resources in the `floci` workspace. It uses the same
 `terraform/` configuration as AWS, with loopback endpoints and state under
@@ -181,12 +184,6 @@ Set `URL` using the command for the app you started. Run the OpenTofu commands f
 ```bash
 curl "${URL%/}/health"
 # {"status":"ok"}
-
-curl -X POST "${URL%/}/hello" -d '{"name":"Ana"}'
-# {"greeting":"Hello, Ana!"}
-
-curl -X POST "${URL%/}/hello?greeting=Hi" -d '{"name":"Ana"}'
-# {"greeting":"Hi, Ana!"}
 ```
 
 The greetings endpoints need DynamoDB. Both deployments provision the table. For the direct local server,

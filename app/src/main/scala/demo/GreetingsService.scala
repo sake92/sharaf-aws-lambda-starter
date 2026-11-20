@@ -7,7 +7,7 @@ import software.amazon.awssdk.services.dynamodb.model.{AttributeValue, GetItemRe
 private[demo] final class GreetingsService(dynamo: DynamoDbClient):
   private val greetingsTable = "sharaf-demo-greetings"
 
-  def findGreeting(id: String): Option[HelloResponse] =
+  def findGreeting(id: String): Option[Greeting] =
     val request = GetItemRequest
       .builder()
       .tableName(greetingsTable)
@@ -15,7 +15,7 @@ private[demo] final class GreetingsService(dynamo: DynamoDbClient):
       .consistentRead(true)
       .build()
     val result = dynamo.getItem(request)
-    if result.hasItem then Some(HelloResponse(result.item().get("greeting").s()))
+    if result.hasItem then Some(Greeting(result.item().get("greeting").s()))
     else None
 
   def createGreeting(greeting: String): CreatedGreeting =

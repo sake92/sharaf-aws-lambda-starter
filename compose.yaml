@@ -9,6 +9,19 @@ services:
       FLOCI_SERVICES_DOCKER_NETWORK: sharaf-floci
       FLOCI_SERVICES_ECR_URI_STYLE: path
 
+  floci-ui:
+    image: floci/floci-ui:0.7.0
+    ports:
+      - "127.0.0.1:4500:4500"
+    environment:
+      FLOCI_ENDPOINT: http://floci:4566
+      AWS_REGION: us-east-1
+      AWS_ACCESS_KEY_ID: test
+      AWS_SECRET_ACCESS_KEY: test
+    depends_on:
+      floci:
+        condition: service_healthy
+
 networks:
   default:
     name: sharaf-floci

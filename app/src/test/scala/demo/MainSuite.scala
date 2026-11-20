@@ -27,35 +27,17 @@ class MainSuite extends FunSuite {
     }
   }
 
-  test("POST /hello returns a greeting") {
-    withServer { (baseUrl, backend) =>
-      val res = quickRequest.post(uri"$baseUrl/hello").body(HelloRequest("Sharaf").toJson).send(backend)
-      assertEquals(res.code.code, 200)
-      assertEquals(res.header("content-type"), Some(jsonContentType))
-      assertEquals(res.body.parseJson[HelloResponse], HelloResponse("Hello, Sharaf!"))
-    }
-  }
-
-  test("POST /hello uses the greeting query parameter") {
-    withServer { (baseUrl, backend) =>
-      val res = quickRequest.post(uri"$baseUrl/hello?greeting=Hi").body(HelloRequest("Sharaf").toJson).send(backend)
-      assertEquals(res.code.code, 200)
-      assertEquals(res.header("content-type"), Some(jsonContentType))
-      assertEquals(res.body.parseJson[HelloResponse], HelloResponse("Hi, Sharaf!"))
-    }
-  }
-
   test("invalid JSON body returns a JSON 400") {
     withServer { (baseUrl, backend) =>
-      val res = quickRequest.post(uri"$baseUrl/hello").body("""{"nope":1}""").send(backend)
+      val res = quickRequest.post(uri"$baseUrl/greetings").body("""{"nope":1}""").send(backend)
       assertEquals(res.code.code, 400)
       assertEquals(res.header("content-type"), Some(jsonContentType))
     }
   }
 
-  test("unknown route returns a JSON 404") {
+  test("removed POST /hello route returns a JSON 404") {
     withServer { (baseUrl, backend) =>
-      val res = quickRequest.get(uri"$baseUrl/does-not-exist").send(backend)
+      val res = quickRequest.post(uri"$baseUrl/hello").body("""{"name":"Ana"}""").send(backend)
       assertEquals(res.code.code, 404)
       assertEquals(res.header("content-type"), Some(jsonContentType))
       val problem = res.body.parseJson[ProblemDetails]
