@@ -22,7 +22,7 @@ variable "name_prefix" {
 }
 
 variable "image_digest" {
-  description = "Digest (sha256:...) of the image pushed to the ECR repository. While null, only ECR and the IAM role are created."
+  description = "Digest (sha256:...) of the image pushed to the ECR repository. While null, the function and its URL are omitted."
   type        = string
   default     = null
 
@@ -76,6 +76,33 @@ resource "aws_iam_role_policy" "logging" {
   policy = data.aws_iam_policy_document.logging.json
 }
 
+resource "aws_dynamodb_table" "greetings" {
+  name           = "sharaf-demo-greetings"
+  billing_mode   = "PROVISIONED"
+  table_class    = "STANDARD"
+  read_capacity  = 1
+  write_capacity = 1
+  hash_key       = "id"
+
+  attribute {
+    name = "id"
+    type = "S"
+  }
+}
+
+data "aws_iam_policy_document" "greetings" {
+  statement {
+    actions   = ["dynamodb:GetItem", "dynamodb:PutItem"]
+    resources = [aws_dynamodb_table.greetings.arn]
+  }
+}
+
+resource "aws_iam_role_policy" "greetings" {
+  name   = "greetings"
+  role   = aws_iam_role.lambda.id
+  policy = data.aws_iam_policy_document.greetings.json
+}
+
 # Created only after an image has been pushed (see README for the two-step first deployment).
 resource "aws_lambda_function" "app" {
   count = var.image_digest == null ? 0 : 1
@@ -88,7 +115,7 @@ resource "aws_lambda_function" "app" {
   memory_size   = 1024
   timeout       = 30
 
-  depends_on = [aws_iam_role_policy.logging, aws_cloudwatch_log_group.app]
+  depends_on = [aws_iam_role_policy.logging, aws_iam_role_policy.greetings, aws_cloudwatch_log_group.app]
 }
 
 resource "aws_lambda_function_url" "app" {
@@ -126,4 +153,8 @@ output "ecr_repository_url" {
 output "function_url" {
   description = "Public Function URL (null until image_digest is set)."
   value       = one(aws_lambda_function_url.app[*].function_url)
+}
+
+output "greetings_table_name" {
+  value = aws_dynamodb_table.greetings.name
 }

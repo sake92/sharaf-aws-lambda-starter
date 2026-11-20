@@ -10,7 +10,8 @@ class MainSuite extends FunSuite {
   private val jsonContentType = "application/json; charset=utf-8"
 
   private def withServer(check: (String, SyncBackend) => Unit): Unit =
-    val server = startServer("127.0.0.1", 0)
+    val server = createServer("127.0.0.1", 0, _ => None, _ => fail("Unexpected greeting write"))
+    server.start()
     try {
       val backend = DefaultSyncBackend()
       try check(s"http://127.0.0.1:${server.port}", backend)

@@ -19,8 +19,9 @@ flowchart TB
     subgraph aws["AWS resources managed by OpenTofu"]
         ecr["ECR repository<br/>App + adapter image"]
         url["Public Lambda Function URL<br/>No authentication"]
-        role["IAM execution role<br/>CloudWatch logging permissions"]
+        role["IAM execution role<br/>CloudWatch logging + DynamoDB GetItem + PutItem"]
         logs["CloudWatch Logs<br/>7-day retention"]
+        table["DynamoDB<br/>Greeting templates"]
 
         subgraph fn["Lambda function - container image"]
             runtime[Lambda Runtime API]
@@ -34,14 +35,15 @@ flowchart TB
         ecr -.->|Deploy image by digest| fn
         role -.->|Assumed by Lambda| fn
         fn -->|Logs| logs
+        fn -->|GetItem / PutItem| table
     end
 
     build -->|Push image| ecr
     client <-->|HTTPS| url
 ```
 
-OpenTofu creates the ECR repository, execution role and log group first. The scripts build and push the image;
-a second apply uses its digest to create the Lambda function and Function URL. ECR stores the deployment image;
+OpenTofu creates the ECR repository, execution role, log group and DynamoDB table first. The scripts build and push the
+image. A second apply uses its digest to create the Lambda function and Function URL. ECR stores the deployment image;
 requests go through the Function URL to the running Lambda environment.
 
 ## Prerequisites
@@ -49,14 +51,14 @@ requests go through the Function URL to the running Lambda environment.
 JDK 21 or later and [sbt](https://www.scala-sbt.org/download/) (the build pins sbt 2.0.12) for JVM development;
 GraalVM 25 with `native-image` and a C toolchain for local native builds; Docker for the image and Floci test;
 [OpenTofu](https://opentofu.org/docs/intro/install/) >= 1.13.2 and AWS CLI v2 for deploying.
-Deploying needs an AWS account and credentials; the Floci test needs neither.
+Deploying needs an AWS account and credentials. The Floci test runs against a local emulator.
 
 ## Run and test locally
 
 Start the app:
 
 ```bash
-sbt app/run
+AWS_REGION=us-east-1 sbt app/run
 ```
 
 In another terminal, test the endpoints:
@@ -85,7 +87,13 @@ sbt app/nativeImage
 target/out/jvm/scala-3.9.0/sharaf-lambda/native-image/sharaf-lambda
 ```
 
-Run the end-to-end integration test with Floci (requires Docker):
+Run the end-to-end integration test with Floci (requires Docker). The suite creates an empty table and
+checks greeting creation, lookup and validation through the Function URL. This verifies the container and
+HTTP integration locally. AWS deployment and cold-start behavior require checks on AWS.
+
+The app uses the fixed DynamoDB table name `sharaf-demo-greetings`. For local DynamoDB requests, set
+`AWS_ENDPOINT_URL_DYNAMODB` to your Floci endpoint and use dummy credentials. The Floci suite configures
+these and creates the table automatically.
 
 ```bash
 sbt integrationTest/testFull
@@ -94,16 +102,16 @@ sbt integrationTest/testFull
 ## Deploy to AWS
 
 > **The Function URL is public and unauthenticated** (`authorization_type = "NONE"`): anyone on the internet can call
-> it and you pay for it. Demo only; destroy it when done. Since Oct 2025 a public URL needs both
-> `lambda:InvokeFunctionUrl` (auth type NONE) and `lambda:InvokeFunction` (invoked via Function URL) permissions;
-> both are in `terraform/main.tf`.
+> it, create public demo greetings, and incur charges on the deploying account. Destroy the demo when you are done.
+> Since October 2025, a public URL needs both `lambda:InvokeFunctionUrl` (auth type NONE) and `lambda:InvokeFunction`
+> (invoked via Function URL). Both permissions are in `terraform/main.tf`.
 
 The Lambda needs an image that must already exist in ECR, hence two applies:
 
 ```bash
 export AWS_REGION=eu-west-1 TF_VAR_region=eu-west-1    # TF_VAR_name_prefix=... to change the default "sharaf-demo"
 tofu -chdir=terraform init
-tofu -chdir=terraform apply                       # 1) ECR repository, IAM role, log group
+tofu -chdir=terraform apply                       # 1) ECR repository, IAM role, log group, DynamoDB table
 scripts/build-image.sh
 DIGEST=$(scripts/push-image.sh "$(tofu -chdir=terraform output -raw ecr_repository_url)")
 tofu -chdir=terraform apply -var "image_digest=$DIGEST"   # 2) Lambda + Function URL
@@ -112,18 +120,34 @@ tofu -chdir=terraform apply -var "image_digest=$DIGEST"   # 2) Lambda + Function
 The function is deployed from the immutable digest (`repo@sha256:...`); the ECR repo is tag-immutable, so
 `push-image.sh` uses a fresh timestamp tag each time.
 
-Call it:
+Call the Function URL and create a greeting. Send non-blank text of up to 256 characters. The Lambda role can
+read and write items in the greetings table.
 
 ```bash
 URL=$(tofu -chdir=terraform output -raw function_url)
 curl "${URL}health"
 curl -X POST "${URL}hello" -d '{"name":"Ana"}'
+curl -i -X POST "${URL}greetings" -H 'Content-Type: application/json' \
+  -d '{"greeting":"Welcome from DynamoDB!"}'
+# HTTP 201 Created with a generated id in the JSON body and a Location header
+
+# Use the path returned in Location.
+curl "${URL}greetings/<id>"
+# {"greeting":"Welcome from DynamoDB!"}
+curl -i "${URL}greetings/missing"
+# HTTP 404
 ```
+
+The fixed table name allows one starter deployment per AWS account and Region. If you deployed an earlier version
+with a custom prefix, review the plan before applying. OpenTofu will replace the differently named table.
+The DynamoDB Standard table provisions 1 read and 1 write capacity unit. AWS includes 25 of each
+and 25 GB of storage in the DynamoDB Free Tier, shared per Region and payer account. Lambda, ECR,
+and CloudWatch Logs have their own pricing. [DynamoDB pricing](https://aws.amazon.com/dynamodb/pricing/)
 
 **Update the image:** change the code, then repeat `build-image.sh`, `push-image.sh`, and
 `tofu -chdir=terraform apply -var "image_digest=$DIGEST"`.
 
-**Remove everything** (Lambda, URL, role, log group, ECR repository *including its images*; the repo uses `force_delete`):
+**Remove everything** (Lambda, URL, role, log group, DynamoDB table and its data, ECR repository *including its images*; the repo uses `force_delete`):
 
 ```bash
 tofu -chdir=terraform destroy
